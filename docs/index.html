@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Download BPS dynamic statistics as tidy CSV and publication PDFs with a zero-dependency Python toolkit.">
+  <meta name="theme-color" content="#075e3b">
+  <title>BPS Data Tools</title>
+  <style>
+    :root {
+      --ink: #101b17;
+      --muted: #52615b;
+      --green: #075e3b;
+      --green-2: #0c7549;
+      --green-soft: #eaf5ef;
+      --blue: #0759c7;
+      --line: #d7e1dc;
+      --paper: #fff;
+      --code: #101c2a;
+      --shadow: 0 18px 50px rgba(8, 40, 27, .12);
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    a { color: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .shell { width: min(var(--max), calc(100% - 40px)); margin-inline: auto; }
+    .site-header { border-bottom: 1px solid var(--line); }
+    .nav { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 13px; text-decoration: none; font-weight: 780; font-size: 1.22rem; }
+    .brand-mark { width: 31px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .brand-mark i { display: block; aspect-ratio: 1; background: var(--green); }
+    .nav-link { display: inline-flex; align-items: center; gap: 9px; color: var(--blue); font-weight: 700; text-decoration: none; }
+    .nav-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+    .icon { width: 21px; height: 21px; flex: none; }
+
+    .hero { position: relative; overflow: hidden; padding: 76px 0 58px; }
+    .hero::after {
+      content: ""; position: absolute; z-index: -1; right: -48px; top: 12px; width: 300px; height: 300px;
+      opacity: .44; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 28px 28px; mask-image: linear-gradient(135deg, transparent 4%, #000 45%, transparent 88%);
+    }
+    .hero-grid { display: grid; grid-template-columns: .92fr 1.08fr; gap: clamp(42px, 7vw, 88px); align-items: center; }
+    h1 { max-width: 650px; margin: 0 0 22px; font-size: clamp(3.2rem, 6.2vw, 5.8rem); line-height: .96; letter-spacing: -.064em; }
+    .lede { max-width: 590px; margin: 0 0 31px; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.28rem); line-height: 1.55; }
+    .actions { display: flex; flex-wrap: wrap; gap: 13px; }
+    .button { display: inline-flex; min-height: 50px; align-items: center; justify-content: center; gap: 10px; padding: 0 21px; border: 1px solid var(--green); border-radius: 5px; color: var(--green); font-weight: 750; text-decoration: none; transition: transform .2s, box-shadow .2s, background .2s; }
+    .button.primary { color: #fff; background: var(--green); }
+    .button:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(7, 94, 59, .16); }
+    .proof { display: flex; flex-wrap: wrap; gap: 9px 24px; margin-top: 28px; color: var(--muted); font-size: .91rem; }
+    .proof span::before { content: "✓"; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 8px; border-radius: 50%; color: var(--green); background: var(--green-soft); font-weight: 900; }
+
+    .terminal { overflow: hidden; border: 1px solid #24374a; border-radius: 9px; background: var(--code); box-shadow: var(--shadow); transform: rotate(.35deg); }
+    .terminal-bar { display: flex; align-items: center; height: 42px; padding: 0 16px; border-bottom: 1px solid #2b3d50; color: #aebccc; background: #162536; font: 700 .8rem/1 ui-monospace, monospace; }
+    .dots { display: flex; gap: 7px; margin-right: auto; }
+    .dots i { width: 10px; height: 10px; border-radius: 50%; background: #ff6b5f; }
+    .dots i:nth-child(2) { background: #f4bd4f; } .dots i:nth-child(3) { background: #61c554; }
+    pre { margin: 0; padding: 25px 26px 29px; overflow-x: auto; color: #e5eef8; font-size: .87rem; line-height: 1.75; }
+    .prompt { color: #70b7ff; } .success { color: #62d28b; } .dim { color: #91a4b6; }
+
+    .workflow { padding: 0 0 82px; }
+    .workflow-inner { display: grid; grid-template-columns: 1.25fr repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; }
+    .workflow-intro, .step { min-height: 145px; padding: 25px; }
+    .workflow-intro { background: var(--green-soft); }
+    .workflow h2 { margin: 0 0 8px; font-size: 1.14rem; color: var(--green); }
+    .workflow p { margin: 0; color: var(--muted); font-size: .91rem; }
+    .step { position: relative; border-left: 1px solid var(--line); }
+    .step:not(:last-child)::after { content: "→"; position: absolute; z-index: 2; right: -13px; top: 28px; color: var(--green); background: #fff; font-size: 1.25rem; }
+    .step-no { display: block; margin-bottom: 22px; color: var(--green); font: 700 .78rem/1 ui-monospace, monospace; }
+    .step strong { display: block; margin-bottom: 5px; font-size: .97rem; }
+
+    .features { padding: 82px 0; border-block: 1px solid var(--line); }
+    .section-heading { max-width: 650px; margin-bottom: 49px; }
+    .section-heading h2 { margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.05; letter-spacing: -.04em; }
+    .section-heading p { margin: 0; color: var(--muted); font-size: 1.08rem; }
+    .feature-list { border-top: 1px solid var(--line); }
+    .feature { display: grid; grid-template-columns: 80px 1fr 1.05fr; gap: 30px; align-items: start; padding: 36px 0; border-bottom: 1px solid var(--line); }
+    .feature-num { color: var(--green); font: 800 1rem/1 ui-monospace, monospace; }
+    .feature h3 { margin: 0; font-size: clamp(1.35rem, 2.4vw, 1.9rem); letter-spacing: -.025em; }
+    .feature p { margin: 0; color: var(--muted); }
+
+    .start { padding: 86px 0; }
+    .start-grid { display: grid; grid-template-columns: .78fr 1.22fr; gap: clamp(40px, 8vw, 105px); }
+    .start h2 { margin: 0 0 14px; font-size: clamp(2.35rem, 4vw, 3.6rem); line-height: 1.04; letter-spacing: -.045em; }
+    .start-copy { color: var(--muted); }
+    .privacy { margin-top: 30px; padding: 22px; border-left: 4px solid var(--green); background: var(--green-soft); }
+    .privacy strong { display: block; color: var(--green); }
+    .privacy p { margin: 5px 0 0; font-size: .92rem; }
+    .commands { display: grid; gap: 15px; }
+    .command { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fbfdfc; }
+    .command-label { display: block; padding: 12px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .82rem; font-weight: 750; }
+    .command pre { padding: 19px 64px 19px 18px; color: var(--ink); font-size: .85rem; line-height: 1.65; }
+    .copy { position: absolute; right: 12px; bottom: 14px; min-width: 42px; height: 34px; border: 1px solid var(--line); border-radius: 4px; color: var(--green); background: #fff; cursor: pointer; font: 750 .76rem/1 inherit; }
+    .copy:hover, .copy:focus-visible { border-color: var(--green); outline: none; }
+
+    footer { border-top: 1px solid var(--line); }
+    .footer-inner { min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 30px; color: var(--muted); font-size: .9rem; }
+    .footer-inner a { color: var(--blue); font-weight: 700; text-decoration: none; }
+    .footer-inner a:hover { text-decoration: underline; }
+
+    @media (max-width: 900px) {
+      .hero { padding-top: 54px; }
+      .hero-grid, .start-grid { grid-template-columns: 1fr; }
+      .terminal { transform: none; }
+      .workflow-inner { grid-template-columns: 1fr 1fr; }
+      .workflow-intro { grid-column: 1 / -1; }
+      .step { border-top: 1px solid var(--line); }
+      .step:nth-child(2), .step:nth-child(4) { border-left: 0; }
+      .step::after { display: none; }
+    }
+    @media (max-width: 650px) {
+      .shell { width: min(100% - 26px, var(--max)); }
+      .nav { min-height: 66px; }
+      .nav-link span { display: none; }
+      .hero { padding: 42px 0; }
+      h1 { font-size: clamp(3rem, 16vw, 4.4rem); }
+      .actions .button { flex: 1 1 100%; }
+      .workflow { padding-bottom: 56px; }
+      .workflow-inner { grid-template-columns: 1fr; }
+      .workflow-intro { grid-column: auto; }
+      .step { min-height: auto; border-left: 0; border-top: 1px solid var(--line); }
+      .step-no { margin-bottom: 12px; }
+      .features, .start { padding: 58px 0; }
+      .feature { grid-template-columns: 48px 1fr; gap: 18px; }
+      .feature p { grid-column: 2; }
+      .footer-inner { padding: 26px 0; align-items: flex-start; flex-direction: column; gap: 8px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav shell" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="BPS Data Tools home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        BPS Data Tools
+      </a>
+      <a class="nav-link" href="https://github.com/hengkykurniawan/bps_download">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.22c-3.22.7-3.9-1.36-3.9-1.36-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.14v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .8Z"/></svg>
+        <span>View on GitHub</span>
+      </a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-grid shell">
+        <div>
+          <h1>BPS data,<br>ready to use.</h1>
+          <p class="lede">A zero-dependency Python toolkit for downloading Indonesian Badan Pusat Statistik dynamic data as tidy CSV and publication PDFs.</p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/hengkykurniawan/bps_download">View on GitHub</a>
+            <a class="button" href="#get-started">Get started <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="proof" aria-label="Project highlights">
+            <span>Python standard library only</span><span>Local web interface</span><span>Resumable downloads</span>
+          </div>
+        </div>
+        <div class="terminal" aria-label="Example BPS Data Tools commands">
+          <div class="terminal-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>Terminal</div>
+          <pre><span class="prompt">$</span> python bps_data.py vars --subject 531
+<span class="success">✓</span> Browse variables in Neraca Ekonomi
+
+<span class="prompt">$</span> python bps_data.py get --var 2776 --th all
+<span class="success">✓</span> Saved tidy, analysis-ready CSV
+
+<span class="prompt">$</span> python bps_download.py 530
+<span class="success">✓</span> Publication downloads resume automatically
+
+<span class="dim"># Or open the local browser interface</span>
+<span class="prompt">$</span> python bps_app.py</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="workflow shell" aria-labelledby="workflow-title">
+      <div class="workflow-inner">
+        <div class="workflow-intro"><h2 id="workflow-title">A clear path to the numbers</h2><p>Move from discovery to a clean dataset in four simple steps.</p></div>
+        <div class="step"><span class="step-no">01</span><strong>Subjects</strong><p>Browse all BPS themes.</p></div>
+        <div class="step"><span class="step-no">02</span><strong>Variables</strong><p>Find the indicator you need.</p></div>
+        <div class="step"><span class="step-no">03</span><strong>Years</strong><p>Select one year or all.</p></div>
+        <div class="step"><span class="step-no">04</span><strong>CSV</strong><p>Download tidy data.</p></div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="shell">
+        <div class="section-heading"><h2>Three ways into BPS data.</h2><p>Use the browser interface for exploration or the command line for repeatable data work.</p></div>
+        <div class="feature-list">
+          <article class="feature"><span class="feature-num">01</span><h3>Local web app</h3><p>Explore subjects, variables, publications, and static tables in a browser UI that runs entirely on your computer.</p></article>
+          <article class="feature"><span class="feature-num">02</span><h3>Statistics to CSV</h3><p>Export dynamic tables into one-row-per-value CSV files with variable, region, year, period, and value fields ready for analysis.</p></article>
+          <article class="feature"><span class="feature-num">03</span><h3>Publication PDFs</h3><p>Bulk-download BPS publications by subject. Interrupted runs resume cleanly by skipping files already on disk.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="start" id="get-started">
+      <div class="start-grid shell">
+        <div>
+          <h2>Start with one key and Python 3.</h2>
+          <p class="start-copy">Clone the repository, save your BPS WebAPI key as <code>.bps_key</code>, then launch the local app. There are no third-party packages to install.</p>
+          <div class="privacy"><strong>Your API key stays local.</strong><p>The key file is ignored by Git and requests are sent directly from your computer to the BPS API.</p></div>
+        </div>
+        <div class="commands">
+          <div class="command"><span class="command-label">1 · Clone</span><pre><code>git clone https://github.com/hengkykurniawan/bps_download.git
+cd bps_download</code></pre><button class="copy" type="button" aria-label="Copy clone commands">Copy</button></div>
+          <div class="command"><span class="command-label">2 · Add your API key</span><pre><code># Create .bps_key and paste your BPS WebAPI key inside</code></pre><button class="copy" type="button" aria-label="Copy API key instruction">Copy</button></div>
+          <div class="command"><span class="command-label">3 · Launch</span><pre><code>python bps_app.py</code></pre><button class="copy" type="button" aria-label="Copy launch command">Copy</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="footer-inner shell"><strong>BPS Data Tools</strong><span>Unofficial toolkit for public BPS data · <a href="https://github.com/hengkykurniawan/bps_download#readme">Read the documentation</a></span></div></footer>
+
+  <script>
+    document.querySelectorAll('.copy').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const text = button.parentElement.querySelector('code').textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          button.textContent = 'Copied';
+          setTimeout(() => { button.textContent = 'Copy'; }, 1400);
+        } catch {
+          const range = document.createRange();
+          range.selectNodeContents(button.parentElement.querySelector('code'));
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          button.textContent = 'Selected';
+          setTimeout(() => { button.textContent = 'Copy'; }, 1400);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

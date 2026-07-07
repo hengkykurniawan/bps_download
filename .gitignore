@@ -1,0 +1,19 @@
+# Local credentials
+.bps_key
+
+# Python runtime files
+__pycache__/
+*.py[cod]
+
+# Downloaded BPS data and app state
+[0-9][0-9][0-9] - */
+data_var*.csv
+data_var*.csv.gz
+update_state.json
+
+# Local editor and OS files
+.venv/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

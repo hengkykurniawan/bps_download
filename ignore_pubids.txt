@@ -1,0 +1,5 @@
+# Publications to skip permanently (BPS server cannot serve them).
+# One pub_id per line; text after '#' is ignored. Re-runs will mark these "ignored".
+8af9decd14323fc9e980a727  # Indikator Ekonomi Februari 2005  (getPdfWatermark.php fatal error)
+eb7526bbb017f3b9dde8a3e1  # Indikator Ekonomi Januari 2005   (getPdfWatermark.php fatal error)
+c821dfe828a28784931b6685  # Indikator Ekonomi Oktober 2002   (getPdfWatermark.php fatal error)
