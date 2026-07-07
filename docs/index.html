@@ -1,248 +1,278 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Download BPS dynamic statistics as tidy CSV and publication PDFs with a zero-dependency Python toolkit.">
-  <meta name="theme-color" content="#075e3b">
-  <title>BPS Data Tools</title>
-  <style>
-    :root {
-      --ink: #101b17;
-      --muted: #52615b;
-      --green: #075e3b;
-      --green-2: #0c7549;
-      --green-soft: #eaf5ef;
-      --blue: #0759c7;
-      --line: #d7e1dc;
-      --paper: #fff;
-      --code: #101c2a;
-      --shadow: 0 18px 50px rgba(8, 40, 27, .12);
-      --max: 1180px;
-    }
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BPS Data Downloader — Interactive App</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--mut:#94a3b8;--bd:#334155;--ac:#38bdf8;--ok:#34d399;--bad:#f87171}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:#0b1220;color:#e2e8f0}
+header{background:var(--bg);padding:14px 20px;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:18px}.sub{color:var(--mut);font-size:12px}
+.state{margin-top:8px;font-size:12px;color:var(--mut)}.state b{color:var(--ac)}
+nav{display:flex;gap:4px;flex-wrap:wrap;padding:10px 20px;background:var(--bg);border-bottom:1px solid var(--bd);position:sticky;top:60px;z-index:4}
+nav button{background:transparent;border:1px solid var(--bd);color:var(--mut);padding:7px 13px;border-radius:8px;cursor:pointer;font-size:13px}
+nav button.on{background:var(--ac);color:#04293b;border-color:var(--ac);font-weight:600}
+.navbadge{background:#ef4444;color:#fff;border-radius:99px;padding:0 7px;font-size:11px;font-weight:700;margin-left:5px;vertical-align:middle;animation:pulse 1.6s infinite}
+main{padding:20px;max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input,select{background:#0b1220;border:1px solid var(--bd);color:#e2e8f0;padding:8px 10px;border-radius:8px;font-size:13px}
+input[type=text]{min-width:240px}
+button.act{background:var(--ac);color:#04293b;border:none;padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer}
+button.gho{background:transparent;border:1px solid var(--bd);color:#e2e8f0;padding:7px 12px;border-radius:8px;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--bd);vertical-align:top}
+th{color:var(--mut);font-weight:600;position:sticky;top:0;background:var(--card)}
+tr.clk:hover{background:#243044;cursor:pointer}
+.pill{display:inline-block;background:#0b1220;border:1px solid var(--bd);border-radius:99px;padding:1px 8px;font-size:11px;color:var(--mut)}
+.muted{color:var(--mut)}.h2{font-size:15px;margin:0 0 10px}
+.cat{margin:14px 0 6px;color:var(--ac);font-weight:600;font-size:13px}
+.scroll{max-height:62vh;overflow:auto;border:1px solid var(--bd);border-radius:10px}
+.bar{height:8px;background:#0b1220;border-radius:6px;overflow:hidden;border:1px solid var(--bd)}
+.bar>i{display:block;height:100%;background:var(--ac);width:0%}
+.tag{font-size:11px;padding:1px 7px;border-radius:6px}.tag.ok{background:#064e3b;color:var(--ok)}.tag.run{background:#0c4a6e;color:var(--ac)}.tag.err{background:#7f1d1d;color:var(--bad)}
+.upd{font-size:11px;padding:1px 7px;border-radius:6px;margin-left:7px;font-weight:700;white-space:nowrap}
+.upd.new{background:#f59e0b;color:#1f2937;box-shadow:0 0 0 2px rgba(245,158,11,.35)}
+.upd.fresh{background:#22c55e;color:#04210f}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}.upd.new{animation:pulse 1.6s infinite}
+a{color:var(--ac)}.hide{display:none}
+.connection{padding:10px 20px;background:#172033;border-bottom:1px solid var(--bd);font-size:12px;color:var(--mut)}
+.connection.ok{background:#073b32;color:#a7f3d0}.connection.err{background:#3b1720;color:#fecdd3}
+.connection code{color:#e2e8f0}.connection button{margin-left:10px}
+@media(max-width:700px){header{position:static}nav{position:static;overflow-x:auto;flex-wrap:nowrap}.connection{padding:10px 14px}main{padding:14px}input[type=text]{min-width:180px}.scroll{max-height:68vh}th,td{padding:7px 6px}}
+.note{font-size:12px;color:var(--mut);margin-top:6px}
+</style></head><body>
+<header><h1>📊 BPS Data Downloader <span class="sub">webapi.bps.go.id · interactive app</span></h1>
+<div class="state" id="state">No subject selected</div></header>
+<div class="connection hide" id="connection" role="status" aria-live="polite"></div>
+<nav id="nav" aria-label="Data tools"></nav>
+<main>
+<div id="v-whatsnew" class="view hide"></div>
+<div id="v-subjects" class="view"></div>
+<div id="v-vars" class="view hide"></div>
+<div id="v-years" class="view hide"></div>
+<div id="v-pubs" class="view hide"></div>
+<div id="v-static" class="view hide"></div>
+<div id="v-downloads" class="view hide"></div>
+<div id="v-settings" class="view hide"></div>
+</main>
+<script>
+const IS_PAGES=location.hostname.endsWith('github.io');
+const API_BASE=IS_PAGES?'http://127.0.0.1:8765':'';
+const api=u=>API_BASE+u;
+const S={subject:null,subjectTitle:null,var:null,varTitle:null,subjects:[],vars:[],newCount:0};
+const $=s=>document.querySelector(s);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function jget(u){const r=await fetch(api(u));if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
+async function jpost(u,b){const r=await fetch(api(u),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
+async function checkConnection(){
+ if(!IS_PAGES)return;
+ const b=$('#connection');b.classList.remove('hide','ok','err');
+ b.innerHTML='Connecting to the private local service at <code>127.0.0.1:8765</code>…';
+ try{const s=await jget('/api/settings');b.classList.add('ok');b.innerHTML=`✓ Local service connected · API key ${s.key_set?'ready':'not set'} <button class="gho" id="reconnect">Reconnect</button>`;}
+ catch(e){b.classList.add('err');b.innerHTML='Local service is offline. In the downloaded repository, run <code>python bps_app.py</code>, then allow local-network access if your browser asks. <button class="gho" id="reconnect">Retry</button>';}
+ const rb=$('#reconnect');if(rb)rb.onclick=checkConnection;
+}
+const TABS=[['whatsnew','🔔 What\'s New'],['subjects','Subjects'],['vars','Variables'],['years','Years & Export'],['pubs','Publications'],['static','Static Tables'],['downloads','Downloads'],['settings','Settings']];
+let cur='subjects';
+function buildNav(){$('#nav').innerHTML=TABS.map(([k,l])=>{
+  const bdg=(k==='whatsnew'&&S.newCount>0)?` <span class="navbadge">${S.newCount}</span>`:'';
+  return `<button data-k="${k}" class="${k==cur?'on':''}">${l}${bdg}</button>`;}).join('');
+ document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>show(b.dataset.k));}
+async function refreshNewCount(){try{const d=await jget('/api/newcount');S.newCount=d.new;buildNav();}catch(e){}}
+function show(k){cur=k;document.querySelectorAll('.view').forEach(v=>v.classList.add('hide'));$('#v-'+k).classList.remove('hide');
+ buildNav();({whatsnew:loadWhatsNew,subjects:loadSubjects,vars:loadVars,years:loadYears,pubs:loadPubs,static:loadStatic,downloads:loadDownloads,settings:loadSettings}[k])();}
+function stateBar(){$('#state').innerHTML=S.subject?`Subject <b>${S.subject}</b> — ${esc(S.subjectTitle)}`+(S.var?` &nbsp;|&nbsp; Variable <b>${S.var}</b> — ${esc(S.varTitle)}`:''):'No subject selected';}
+function badge(it){if(!it)return'';if(it.changed)return `<span class="upd new" title="updated ${esc(it.ts)} — new since you last checked">● NEW</span>`;
+ if(it.recent)return `<span class="upd fresh" title="updated ${esc(it.ts)}">↻ ${it.days_ago}d</span>`;return'';}
+function updStatus(t){const el=document.getElementById('updstat');if(el)el.textContent=t;}
+let checking=false;
+async function startCheck(){if(checking||!S.subject)return;checking=true;updStatus('Checking updates… (fetching last-update of each variable)');
+ try{const r=await jpost('/api/check_updates',{subject:S.subject});
+  const poll=setInterval(async()=>{let jobs;try{jobs=await jget('/api/jobs');}catch(e){return;}
+   const j=jobs.find(x=>x.id==r.job);
+   if(j&&j.status!=='running'){clearInterval(poll);checking=false;refreshNewCount();if(cur==='vars')loadVars();}
+   else if(j){updStatus(`Checking updates… ${j.done}/${j.total}`);}},1200);
+ }catch(e){checking=false;updStatus('Check failed: '+e.message);}}
 
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      color: var(--ink);
-      background: var(--paper);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 16px;
-      line-height: 1.6;
-    }
-    a { color: inherit; }
-    button, a { -webkit-tap-highlight-color: transparent; }
-    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+// ---- What's New (digest across ALL scanned subjects)
+let scanning=false;
+async function startScanAll(force){if(scanning)return;scanning=true;
+ const ss=document.getElementById('scanstat');if(ss)ss.textContent='Scanning all subjects… starting';
+ try{const r=await jpost('/api/scan_all',{force:!!force});
+  const poll=setInterval(async()=>{let jobs;try{jobs=await jget('/api/jobs');}catch(e){return;}
+   const j=jobs.find(x=>x.id==r.job);
+   if(j&&j.status!=='running'){clearInterval(poll);scanning=false;refreshNewCount();if(cur==='whatsnew')loadWhatsNew();}
+   else if(j){const b=document.getElementById('scanstat');if(b)b.textContent=`Scanning… ${j.done}/${j.total} — ${j.current||''}`;}
+  },1500);
+ }catch(e){scanning=false;alert('Scan failed: '+e.message);}}
+async function loadWhatsNew(){const el=$('#v-whatsnew');
+ if(!scanning)el.innerHTML='<div class="card">Loading what\'s new…</div>';
+ let d;try{d=await jget('/api/whatsnew');}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ const tn=d.subjects.reduce((a,s)=>a+s.n_new,0),tr=d.subjects.reduce((a,s)=>a+s.n_recent,0);
+ const scanTxt=d.scanned_all?('all subjects scanned '+esc(d.scanned_all)):'full scan not run yet';
+ let h=`<div class="card"><div class="row"><div class="h2" style="margin:0">🔔 What's New</div>
+    <button class="act" id="bscan">🔄 Scan all subjects</button>
+    <button class="gho" id="bref">Refresh view</button>
+    <span id="scanstat" class="muted">${scanning?'Scanning…':scanTxt}</span></div>
+   <div class="note"><span class="upd new">● ${tn} NEW</span> &nbsp; <span class="upd fresh">↻ ${tr} updated ≤30d</span> &nbsp; across ${d.subjects.length} subject(s) — variables + publications</div>`;
+ if(!d.scanned_all)h+=`<div class="note" style="color:#fbbf24">⚠ The full scan hasn't run, so this only covers subjects you've opened. Click <b>Scan all subjects</b> (a few minutes) to track every subject — runs in the background; watch progress in the Downloads tab.</div>`;
+ h+='</div>';
+ if(!d.subjects.length)h+='<div class="card muted">Nothing updated in the last 30 days. Run a scan to populate.</div>';
+ d.subjects.forEach(s=>{
+   h+=`<div class="cat">subject ${s.id} — ${esc(s.title)} <span class="muted">· ${s.n_new} new · ${s.n_recent} recent</span></div>`;
+   h+='<div class="card" style="padding:6px"><table><tbody>';
+   s.items.slice(0,40).forEach(it=>{h+=`<tr class="clk" data-k="${it.kind}" data-s="${s.id}" data-st="${esc(s.title)}" data-i="${esc(it.id)}" data-t="${esc(it.title)}" data-pdf="${esc(it.pdf||'')}"><td style="width:54px"><span class="pill">${it.kind}</span></td><td>${esc(it.title)}${badge(it)}</td><td style="width:150px" class="muted">${esc(it.ts)}</td></tr>`;});
+   if(s.items.length>40)h+=`<tr><td colspan="3" class="muted">…and ${s.items.length-40} more</td></tr>`;
+   h+='</tbody></table></div>';});
+ S.newCount=tn;buildNav();
+ el.innerHTML=h;
+ $('#bscan').onclick=()=>startScanAll(false);
+ $('#bref').onclick=loadWhatsNew;
+ el.querySelectorAll('tr.clk').forEach(r=>r.onclick=()=>{
+   if(r.dataset.k==='pub'){if(r.dataset.pdf)window.open(r.dataset.pdf,'_blank');return;}
+   S.subject=r.dataset.s;S.subjectTitle=r.dataset.st;S.var=r.dataset.i;S.varTitle=r.dataset.t;S.vars=[];stateBar();show('years');});}
 
-    .shell { width: min(var(--max), calc(100% - 40px)); margin-inline: auto; }
-    .site-header { border-bottom: 1px solid var(--line); }
-    .nav { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-    .brand { display: inline-flex; align-items: center; gap: 13px; text-decoration: none; font-weight: 780; font-size: 1.22rem; }
-    .brand-mark { width: 31px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
-    .brand-mark i { display: block; aspect-ratio: 1; background: var(--green); }
-    .nav-link { display: inline-flex; align-items: center; gap: 9px; color: var(--blue); font-weight: 700; text-decoration: none; }
-    .nav-link:hover { text-decoration: underline; text-underline-offset: 4px; }
-    .icon { width: 21px; height: 21px; flex: none; }
+// ---- Subjects (search input rendered ONCE; only the list updates on keystroke)
+async function loadSubjects(){const el=$('#v-subjects');
+ if(!S.subjects.length){el.innerHTML='<div class="card">Loading subjects…</div>';
+  try{S.subjects=await jget('/api/subjects');}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+' — check the Settings tab (API key).</div>';return;}}
+ el.innerHTML=`<div class="card"><div class="row"><input type="text" id="sq" placeholder="Search subjects…"><span class="muted" id="scount"></span></div></div><div id="subjlist"></div>`;
+ $('#sq').oninput=e=>renderSubjectRows(e.target.value);
+ renderSubjectRows('');$('#sq').focus();}
+function renderSubjectRows(f){const q=(f||'').toLowerCase();
+ const items=S.subjects.filter(s=>!q||(s.title||'').toLowerCase().includes(q)||String(s.id).includes(q));
+ $('#scount').textContent=items.length+' of '+S.subjects.length;
+ const cats={};items.forEach(s=>{(cats[s.subcat]=cats[s.subcat]||[]).push(s);});
+ let h='';
+ for(const c of Object.keys(cats).sort()){h+=`<div class="cat">${esc(c)}</div><div class="card" style="padding:6px"><table><tbody>`;
+  cats[c].sort((a,b)=>a.id-b.id).forEach(s=>{h+=`<tr class="clk" data-id="${s.id}" data-t="${esc(s.title)}"><td style="width:80px"><span class="pill">${s.id}</span></td><td>${esc(s.title)}</td><td style="width:120px" class="muted">${s.ntabel!=null?s.ntabel+' tabel':''}</td></tr>`;});
+  h+='</tbody></table></div>';}
+ $('#subjlist').innerHTML=h;
+ $('#subjlist').querySelectorAll('tr.clk').forEach(r=>r.onclick=()=>{S.subject=r.dataset.id;S.subjectTitle=r.dataset.t;S.var=null;S.vars=[];stateBar();show('vars');});}
 
-    .hero { position: relative; overflow: hidden; padding: 76px 0 58px; }
-    .hero::after {
-      content: ""; position: absolute; z-index: -1; right: -48px; top: 12px; width: 300px; height: 300px;
-      opacity: .44; background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
-      background-size: 28px 28px; mask-image: linear-gradient(135deg, transparent 4%, #000 45%, transparent 88%);
-    }
-    .hero-grid { display: grid; grid-template-columns: .92fr 1.08fr; gap: clamp(42px, 7vw, 88px); align-items: center; }
-    h1 { max-width: 650px; margin: 0 0 22px; font-size: clamp(3.2rem, 6.2vw, 5.8rem); line-height: .96; letter-spacing: -.064em; }
-    .lede { max-width: 590px; margin: 0 0 31px; color: var(--muted); font-size: clamp(1.08rem, 2vw, 1.28rem); line-height: 1.55; }
-    .actions { display: flex; flex-wrap: wrap; gap: 13px; }
-    .button { display: inline-flex; min-height: 50px; align-items: center; justify-content: center; gap: 10px; padding: 0 21px; border: 1px solid var(--green); border-radius: 5px; color: var(--green); font-weight: 750; text-decoration: none; transition: transform .2s, box-shadow .2s, background .2s; }
-    .button.primary { color: #fff; background: var(--green); }
-    .button:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(7, 94, 59, .16); }
-    .proof { display: flex; flex-wrap: wrap; gap: 9px 24px; margin-top: 28px; color: var(--muted); font-size: .91rem; }
-    .proof span::before { content: "✓"; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 8px; border-radius: 50%; color: var(--green); background: var(--green-soft); font-weight: 900; }
+// ---- Variables (search input rendered ONCE; rows sorted by most-recent update)
+async function loadVars(){const el=$('#v-vars');if(!S.subject){el.innerHTML='<div class="card">Pick a subject first (Subjects tab).</div>';return;}
+ el.innerHTML='<div class="card">Loading variables…</div>';
+ try{S.vars=await jget('/api/vars?subject='+S.subject);}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ try{S.meta=await jget('/api/update_meta?subject='+S.subject);}catch(e){S.meta={checked:null,recent_days:30};}
+ // sort by most-recent update (last_update desc); undated entries last, then by var id
+ S.vars.sort((a,b)=>{const ta=a.ts||'',tb=b.ts||'';if(ta&&tb)return tb.localeCompare(ta);if(ta)return -1;if(tb)return 1;return a.var_id-b.var_id;});
+ const nNew=S.vars.filter(v=>v.changed).length,nFresh=S.vars.filter(v=>v.recent).length,rd=(S.meta&&S.meta.recent_days)||30;
+ el.innerHTML=`<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start">
+    <div class="h2" style="margin:0">Variables · subject ${S.subject} — ${esc(S.subjectTitle)}</div>
+    <button class="act" id="bdall">⬇ Download all ${S.vars.length} variables (CSV)</button></div>
+  <div class="row" style="margin-top:8px"><input type="text" id="vq" placeholder="Search variables…"><span class="muted" id="vcount"></span></div>
+  <div class="row" style="margin-top:10px">
+   <button class="gho" id="bchk">🔄 Check updates</button>
+   <button class="gho" id="bseen">✓ Mark all seen</button>
+   <span id="updstat" class="muted">${S.meta&&S.meta.checked?('last checked '+esc(S.meta.checked)):'not checked yet'}</span></div>
+  <div class="note">Sorted by most-recent update (newest first). <span class="upd fresh">↻ Nd</span> updated within ${rd} days (${nFresh}) &nbsp; <span class="upd new">● NEW</span> changed since you last marked seen (${nNew})</div></div>
+  <div class="scroll"><table><thead><tr><th style="width:70px">var</th><th>Title</th><th style="width:155px">Last update</th><th style="width:120px">Unit</th></tr></thead><tbody id="vtb"></tbody></table></div>`;
+ $('#vq').oninput=e=>renderVarRows(e.target.value);
+ $('#bchk').onclick=()=>startCheck();
+ $('#bseen').onclick=async()=>{try{await jpost('/api/mark_seen',{subject:S.subject});await refreshNewCount();loadVars();}catch(e){alert('Error: '+e.message);}};
+ $('#bdall').onclick=bulkDownloadVars;
+ renderVarRows('');
+ if(!S.meta.checked&&!checking)startCheck();}
+function renderVarRows(f){const q=(f||'').toLowerCase();
+ const items=S.vars.filter(v=>!q||(v.title||'').toLowerCase().includes(q)||String(v.var_id).includes(q));
+ $('#vcount').textContent=items.length+' of '+S.vars.length;
+ $('#vtb').innerHTML=items.map(v=>`<tr class="clk" data-id="${v.var_id}" data-t="${esc(v.title)}"><td><span class="pill">${v.var_id}</span></td><td>${esc(v.title)}${badge(v)}</td><td class="muted">${esc(v.ts||'—')}</td><td class="muted">${esc(v.unit)}</td></tr>`).join('');
+ $('#vtb').querySelectorAll('tr.clk').forEach(r=>r.onclick=()=>{S.var=r.dataset.id;S.varTitle=r.dataset.t;stateBar();show('years');});}
+async function bulkDownloadVars(){if(!S.vars.length)return;
+ if(!confirm('Export all '+S.vars.length+' variables (all available years) for subject '+S.subject+' into one CSV?\n\nThis can be large and take several minutes. It runs in the background — watch the Downloads tab.'))return;
+ try{const r=await jpost('/api/save_csv',{vars:S.vars.map(v=>String(v.var_id)),thmode:'all',fname:'subject_'+S.subject+'_all.csv'});
+  alert('Bulk export started (job '+r.job+'). Open the Downloads tab to watch progress.');show('downloads');}catch(e){alert('Error: '+e.message);}}
 
-    .terminal { overflow: hidden; border: 1px solid #24374a; border-radius: 9px; background: var(--code); box-shadow: var(--shadow); transform: rotate(.35deg); }
-    .terminal-bar { display: flex; align-items: center; height: 42px; padding: 0 16px; border-bottom: 1px solid #2b3d50; color: #aebccc; background: #162536; font: 700 .8rem/1 ui-monospace, monospace; }
-    .dots { display: flex; gap: 7px; margin-right: auto; }
-    .dots i { width: 10px; height: 10px; border-radius: 50%; background: #ff6b5f; }
-    .dots i:nth-child(2) { background: #f4bd4f; } .dots i:nth-child(3) { background: #61c554; }
-    pre { margin: 0; padding: 25px 26px 29px; overflow-x: auto; color: #e5eef8; font-size: .87rem; line-height: 1.75; }
-    .prompt { color: #70b7ff; } .success { color: #62d28b; } .dim { color: #91a4b6; }
+// ---- Years & export
+async function loadYears(){const el=$('#v-years');if(!S.var){el.innerHTML='<div class="card">Pick a variable first (Variables tab).</div>';return;}
+ el.innerHTML='<div class="card">Loading periods…</div>';let ys;
+ try{ys=await jget('/api/years?var='+S.var);}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ let h=`<div class="card"><div class="h2">Years & Export · var ${S.var} — ${esc(S.varTitle)}</div>
+  <div class="row" style="margin-bottom:8px"><label class="muted">Periods:</label>
+   <select id="ysel" multiple size="${Math.min(8,Math.max(3,ys.length))}" style="min-width:240px">
+   ${ys.map(y=>`<option value="${y.th_id}">${esc(y.th)} (th=${y.th_id})</option>`).join('')}</select></div>
+  <div class="note">Ctrl/Shift-click to select multiple. Leave empty = use "All years".</div>
+  <div class="row" style="margin-top:12px">
+   <button class="gho" id="bprev">Preview</button>
+   <button class="act" id="bcsv">Download CSV (browser)</button>
+   <button class="act" id="bsave">Save CSV to folder</button>
+   <label class="muted"><input type="checkbox" id="ball"> all years</label>
+   <label class="muted"><input type="checkbox" id="bgz"> gzip (save)</label>
+  </div></div>
+  <div id="prev"></div>`;
+ el.innerHTML=h;
+ const sel=()=>Array.from($('#ysel').selectedOptions).map(o=>o.value);
+ $('#bprev').onclick=async()=>{const th=($('#ball').checked?[ys[0].th_id]:sel());if(!th.length){alert('Select a period or use Preview on the first.');return;}
+  $('#prev').innerHTML='<div class="card">Loading preview…</div>';
+  try{const d=await jget(`/api/preview?var=${S.var}&th=${th[0]}`);
+   let t=`<div class="card"><div class="h2">Preview — ${d.total} rows total (showing ${d.rows.length})</div><div class="scroll"><table><thead><tr>${d.cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+   d.rows.forEach(r=>{t+='<tr>'+d.cols.map(c=>`<td>${esc(r[c])}</td>`).join('')+'</tr>';});
+   $('#prev').innerHTML=t+'</tbody></table></div></div>';}catch(e){$('#prev').innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';}};
+ $('#bcsv').onclick=()=>{let th=$('#ball').checked?ys.map(y=>y.th_id):sel();if(!th.length){alert('Select at least one period (or tick all years).');return;}
+  window.location=api('/api/data.csv?var='+S.var+'&th='+th.join('&th='));};
+ $('#bsave').onclick=async()=>{const all=$('#ball').checked;const ths=sel();if(!all&&!ths.length){alert('Select periods or tick all years.');return;}
+  try{const r=await jpost('/api/save_csv',{vars:[S.var],thmode:all?'all':'list',ths:ths,gzip:$('#bgz').checked});alert('Saving started (job '+r.job+'). See Downloads tab.');show('downloads');}catch(e){alert('Error: '+e.message);}};}
 
-    .workflow { padding: 0 0 82px; }
-    .workflow-inner { display: grid; grid-template-columns: 1.25fr repeat(4, 1fr); border: 1px solid var(--line); border-radius: 8px; }
-    .workflow-intro, .step { min-height: 145px; padding: 25px; }
-    .workflow-intro { background: var(--green-soft); }
-    .workflow h2 { margin: 0 0 8px; font-size: 1.14rem; color: var(--green); }
-    .workflow p { margin: 0; color: var(--muted); font-size: .91rem; }
-    .step { position: relative; border-left: 1px solid var(--line); }
-    .step:not(:last-child)::after { content: "→"; position: absolute; z-index: 2; right: -13px; top: 28px; color: var(--green); background: #fff; font-size: 1.25rem; }
-    .step-no { display: block; margin-bottom: 22px; color: var(--green); font: 700 .78rem/1 ui-monospace, monospace; }
-    .step strong { display: block; margin-bottom: 5px; font-size: .97rem; }
+// ---- Publications
+async function loadPubs(){const el=$('#v-pubs');if(!S.subject){el.innerHTML='<div class="card">Pick a subject first.</div>';return;}
+ el.innerHTML='<div class="card">Loading publications…</div>';let pubs;
+ try{pubs=await jget('/api/publications?subject='+S.subject);}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ let h=`<div class="card"><div class="h2">Publications (PDF) · subject ${S.subject} — ${esc(S.subjectTitle)}</div>
+  <div class="row"><span class="pill">${pubs.length} PDFs</span>
+   <button class="act" id="ball">⬇ Download ALL to folder</button>
+   <input type="text" id="pq" placeholder="Filter titles…"></div></div>
+  <div class="scroll"><table><thead><tr><th>Title</th><th style="width:90px">Size</th><th style="width:100px">Date</th><th style="width:80px"></th></tr></thead><tbody id="ptb"></tbody></table></div>`;
+ el.innerHTML=h;
+ const draw=f=>{const q=(f||'').toLowerCase();$('#ptb').innerHTML=pubs.filter(p=>!q||p.title.toLowerCase().includes(q)).map(p=>
+   `<tr><td>${esc(p.title)}${badge(p)}</td><td class="muted">${esc(p.size)}</td><td class="muted">${esc(p.rl_date)}</td><td>${p.pdf?`<a href="${esc(p.pdf)}" target="_blank">open</a>`:'<span class="muted">—</span>'}</td></tr>`).join('');};
+ draw('');$('#pq').oninput=e=>draw(e.target.value);
+ $('#ball').onclick=async()=>{try{const r=await jpost('/api/download_pubs',{subject:S.subject,subject_title:S.subjectTitle});alert('Download started (job '+r.job+'). See Downloads tab.');show('downloads');}catch(e){alert('Error: '+e.message);}};}
 
-    .features { padding: 82px 0; border-block: 1px solid var(--line); }
-    .section-heading { max-width: 650px; margin-bottom: 49px; }
-    .section-heading h2 { margin: 0 0 12px; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.05; letter-spacing: -.04em; }
-    .section-heading p { margin: 0; color: var(--muted); font-size: 1.08rem; }
-    .feature-list { border-top: 1px solid var(--line); }
-    .feature { display: grid; grid-template-columns: 80px 1fr 1.05fr; gap: 30px; align-items: start; padding: 36px 0; border-bottom: 1px solid var(--line); }
-    .feature-num { color: var(--green); font: 800 1rem/1 ui-monospace, monospace; }
-    .feature h3 { margin: 0; font-size: clamp(1.35rem, 2.4vw, 1.9rem); letter-spacing: -.025em; }
-    .feature p { margin: 0; color: var(--muted); }
+// ---- Static tables
+async function loadStatic(){const el=$('#v-static');
+ el.innerHTML=`<div class="card"><div class="h2">Static Tables (Excel)</div>
+  <div class="row"><button class="gho" id="ball">Load ALL static tables</button>
+   ${S.subject?`<button class="act" id="bsub">Load for subject ${S.subject}</button>`:''}
+   <input type="text" id="tq" placeholder="Filter titles…"></div>
+  <div class="note">Note: BPS's static-table subject filter is unreliable; "for subject" approximates via the subject's accounts family. Excel files open in a new tab to download.</div></div>
+  <div id="stb"></div>`;
+ const draw=(rows,f)=>{const q=(f||'').toLowerCase();const r=rows.filter(t=>!q||t.title.toLowerCase().includes(q));
+  $('#stb').innerHTML=`<div class="scroll"><table><thead><tr><th>Title</th><th style="width:160px">Subject</th><th style="width:80px">Size</th><th style="width:70px"></th></tr></thead><tbody>`+
+   r.map(t=>`<tr><td>${esc(t.title)}${badge(t)}</td><td class="muted">${esc(t.subj)}</td><td class="muted">${esc(t.size)}</td><td>${t.excel?`<a href="${esc(t.excel)}" target="_blank">xlsx</a>`:'—'}</td></tr>`).join('')+'</tbody></table></div>';};
+ const load=async u=>{$('#stb').innerHTML='<div class="card">Loading… (this fetches up to 685 tables)</div>';try{const rows=await jget(u);$('#stb').dataset.n=rows.length;window._st=rows;draw(rows,'');$('#tq').oninput=e=>draw(rows,e.target.value);}catch(e){$('#stb').innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';}};
+ $('#ball').onclick=()=>load('/api/statictables');
+ if($('#bsub'))$('#bsub').onclick=()=>load('/api/statictables?subject='+S.subject);}
 
-    .start { padding: 86px 0; }
-    .start-grid { display: grid; grid-template-columns: .78fr 1.22fr; gap: clamp(40px, 8vw, 105px); }
-    .start h2 { margin: 0 0 14px; font-size: clamp(2.35rem, 4vw, 3.6rem); line-height: 1.04; letter-spacing: -.045em; }
-    .start-copy { color: var(--muted); }
-    .privacy { margin-top: 30px; padding: 22px; border-left: 4px solid var(--green); background: var(--green-soft); }
-    .privacy strong { display: block; color: var(--green); }
-    .privacy p { margin: 5px 0 0; font-size: .92rem; }
-    .commands { display: grid; gap: 15px; }
-    .command { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: #fbfdfc; }
-    .command-label { display: block; padding: 12px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: .82rem; font-weight: 750; }
-    .command pre { padding: 19px 64px 19px 18px; color: var(--ink); font-size: .85rem; line-height: 1.65; }
-    .copy { position: absolute; right: 12px; bottom: 14px; min-width: 42px; height: 34px; border: 1px solid var(--line); border-radius: 4px; color: var(--green); background: #fff; cursor: pointer; font: 750 .76rem/1 inherit; }
-    .copy:hover, .copy:focus-visible { border-color: var(--green); outline: none; }
+// ---- Downloads
+let dpoll=null;
+async function loadDownloads(){const el=$('#v-downloads');
+ const render=async()=>{let jobs;try{jobs=await jget('/api/jobs');}catch(e){return;}
+  if(!jobs.length){el.innerHTML='<div class="card">No download jobs yet. Start one from Publications or Years & Export.</div>';return;}
+  el.innerHTML='<div class="card"><div class="row"><div class="h2" style="margin:0">Download jobs</div><button class="gho" id="ofolder">Open data folder</button></div></div>'+jobs.map(j=>{
+   const pct=j.total?Math.round(j.done/j.total*100):0;const tag=j.status=='done'?'ok':(j.status=='error'?'err':'run');
+   return `<div class="card"><div class="row"><span class="tag ${tag}">${j.status}</span><b>${j.kind.toUpperCase()}</b> <span class="muted">${j.id}</span>
+    <span class="muted">${j.done}/${j.total}</span></div>
+    <div class="bar" style="margin:8px 0"><i style="width:${pct}%"></i></div>
+    <div class="muted">${esc(j.current||j.error||(j.folder||''))}</div>
+    ${j.log&&j.log.length?`<details><summary class="muted">log (${j.log.length})</summary><pre style="white-space:pre-wrap;font-size:12px;color:#9fb3c8">${esc(j.log.slice(-40).join('\n'))}</pre></details>`:''}</div>`;}).join('');
+  const of=$('#ofolder');if(of)of.onclick=()=>fetch(api('/api/open_folder'));};
+ await render();clearInterval(dpoll);dpoll=setInterval(()=>{if(cur=='downloads')render();else clearInterval(dpoll);},1500);}
 
-    footer { border-top: 1px solid var(--line); }
-    .footer-inner { min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 30px; color: var(--muted); font-size: .9rem; }
-    .footer-inner a { color: var(--blue); font-weight: 700; text-decoration: none; }
-    .footer-inner a:hover { text-decoration: underline; }
+// ---- Settings
+async function loadSettings(){const el=$('#v-settings');let s,doms=[];
+ try{s=await jget('/api/settings');}catch(e){s={domain:'0000',lang:'ind',perpage:100,key_set:false};}
+ try{doms=await jget('/api/domains');}catch(e){}
+ el.innerHTML=`<div class="card"><div class="h2">Settings</div>
+  <div class="row" style="margin-bottom:10px"><label style="width:130px">Region (domain)</label>
+   <select id="sd">${doms.length?doms.map(d=>`<option value="${d.id}" ${d.id==s.domain?'selected':''}>${esc(d.id)} — ${esc(d.name)}</option>`).join(''):`<option value="${esc(s.domain)}">${esc(s.domain)}</option>`}</select></div>
+  <div class="row" style="margin-bottom:10px"><label style="width:130px">Language</label>
+   <select id="sl"><option value="ind" ${s.lang=='ind'?'selected':''}>Indonesian</option><option value="eng" ${s.lang=='eng'?'selected':''}>English</option></select></div>
+  <div class="row" style="margin-bottom:10px"><label style="width:130px">API key</label>
+   <input type="text" id="sk" placeholder="${s.key_set?esc(s.key_masked)+' (leave blank to keep)':'paste key'}"></div>
+  <div class="row"><button class="act" id="ssave">Save settings</button> <span id="smsg" class="muted"></span></div>
+  <div class="note">Region changes which office's data you get (0000 = national). Changing it resets cached lists.</div></div>`;
+ $('#ssave').onclick=async()=>{const body={domain:$('#sd').value,lang:$('#sl').value};const k=$('#sk').value.trim();if(k)body.key=k;
+  try{await jpost('/api/settings',body);S.subjects=[];S.vars=[];$('#smsg').textContent='Saved ✓';}catch(e){$('#smsg').textContent='Error: '+e.message;}};}
 
-    @media (max-width: 900px) {
-      .hero { padding-top: 54px; }
-      .hero-grid, .start-grid { grid-template-columns: 1fr; }
-      .terminal { transform: none; }
-      .workflow-inner { grid-template-columns: 1fr 1fr; }
-      .workflow-intro { grid-column: 1 / -1; }
-      .step { border-top: 1px solid var(--line); }
-      .step:nth-child(2), .step:nth-child(4) { border-left: 0; }
-      .step::after { display: none; }
-    }
-    @media (max-width: 650px) {
-      .shell { width: min(100% - 26px, var(--max)); }
-      .nav { min-height: 66px; }
-      .nav-link span { display: none; }
-      .hero { padding: 42px 0; }
-      h1 { font-size: clamp(3rem, 16vw, 4.4rem); }
-      .actions .button { flex: 1 1 100%; }
-      .workflow { padding-bottom: 56px; }
-      .workflow-inner { grid-template-columns: 1fr; }
-      .workflow-intro { grid-column: auto; }
-      .step { min-height: auto; border-left: 0; border-top: 1px solid var(--line); }
-      .step-no { margin-bottom: 12px; }
-      .features, .start { padding: 58px 0; }
-      .feature { grid-template-columns: 48px 1fr; gap: 18px; }
-      .feature p { grid-column: 2; }
-      .footer-inner { padding: 26px 0; align-items: flex-start; flex-direction: column; gap: 8px; }
-    }
-    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
-  </style>
-</head>
-<body>
-  <header class="site-header">
-    <nav class="nav shell" aria-label="Primary navigation">
-      <a class="brand" href="#top" aria-label="BPS Data Tools home">
-        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-        BPS Data Tools
-      </a>
-      <a class="nav-link" href="https://github.com/hengkykurniawan/bps_download">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .8a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.22c-3.22.7-3.9-1.36-3.9-1.36-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.38.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.14v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .8Z"/></svg>
-        <span>View on GitHub</span>
-      </a>
-    </nav>
-  </header>
-
-  <main id="top">
-    <section class="hero">
-      <div class="hero-grid shell">
-        <div>
-          <h1>BPS data,<br>ready to use.</h1>
-          <p class="lede">A zero-dependency Python toolkit for downloading Indonesian Badan Pusat Statistik dynamic data as tidy CSV and publication PDFs.</p>
-          <div class="actions">
-            <a class="button primary" href="https://github.com/hengkykurniawan/bps_download">View on GitHub</a>
-            <a class="button" href="#get-started">Get started <span aria-hidden="true">→</span></a>
-          </div>
-          <div class="proof" aria-label="Project highlights">
-            <span>Python standard library only</span><span>Local web interface</span><span>Resumable downloads</span>
-          </div>
-        </div>
-        <div class="terminal" aria-label="Example BPS Data Tools commands">
-          <div class="terminal-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>Terminal</div>
-          <pre><span class="prompt">$</span> python bps_data.py vars --subject 531
-<span class="success">✓</span> Browse variables in Neraca Ekonomi
-
-<span class="prompt">$</span> python bps_data.py get --var 2776 --th all
-<span class="success">✓</span> Saved tidy, analysis-ready CSV
-
-<span class="prompt">$</span> python bps_download.py 530
-<span class="success">✓</span> Publication downloads resume automatically
-
-<span class="dim"># Or open the local browser interface</span>
-<span class="prompt">$</span> python bps_app.py</pre>
-        </div>
-      </div>
-    </section>
-
-    <section class="workflow shell" aria-labelledby="workflow-title">
-      <div class="workflow-inner">
-        <div class="workflow-intro"><h2 id="workflow-title">A clear path to the numbers</h2><p>Move from discovery to a clean dataset in four simple steps.</p></div>
-        <div class="step"><span class="step-no">01</span><strong>Subjects</strong><p>Browse all BPS themes.</p></div>
-        <div class="step"><span class="step-no">02</span><strong>Variables</strong><p>Find the indicator you need.</p></div>
-        <div class="step"><span class="step-no">03</span><strong>Years</strong><p>Select one year or all.</p></div>
-        <div class="step"><span class="step-no">04</span><strong>CSV</strong><p>Download tidy data.</p></div>
-      </div>
-    </section>
-
-    <section class="features">
-      <div class="shell">
-        <div class="section-heading"><h2>Three ways into BPS data.</h2><p>Use the browser interface for exploration or the command line for repeatable data work.</p></div>
-        <div class="feature-list">
-          <article class="feature"><span class="feature-num">01</span><h3>Local web app</h3><p>Explore subjects, variables, publications, and static tables in a browser UI that runs entirely on your computer.</p></article>
-          <article class="feature"><span class="feature-num">02</span><h3>Statistics to CSV</h3><p>Export dynamic tables into one-row-per-value CSV files with variable, region, year, period, and value fields ready for analysis.</p></article>
-          <article class="feature"><span class="feature-num">03</span><h3>Publication PDFs</h3><p>Bulk-download BPS publications by subject. Interrupted runs resume cleanly by skipping files already on disk.</p></article>
-        </div>
-      </div>
-    </section>
-
-    <section class="start" id="get-started">
-      <div class="start-grid shell">
-        <div>
-          <h2>Start with one key and Python 3.</h2>
-          <p class="start-copy">Clone the repository, save your BPS WebAPI key as <code>.bps_key</code>, then launch the local app. There are no third-party packages to install.</p>
-          <div class="privacy"><strong>Your API key stays local.</strong><p>The key file is ignored by Git and requests are sent directly from your computer to the BPS API.</p></div>
-        </div>
-        <div class="commands">
-          <div class="command"><span class="command-label">1 · Clone</span><pre><code>git clone https://github.com/hengkykurniawan/bps_download.git
-cd bps_download</code></pre><button class="copy" type="button" aria-label="Copy clone commands">Copy</button></div>
-          <div class="command"><span class="command-label">2 · Add your API key</span><pre><code># Create .bps_key and paste your BPS WebAPI key inside</code></pre><button class="copy" type="button" aria-label="Copy API key instruction">Copy</button></div>
-          <div class="command"><span class="command-label">3 · Launch</span><pre><code>python bps_app.py</code></pre><button class="copy" type="button" aria-label="Copy launch command">Copy</button></div>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer><div class="footer-inner shell"><strong>BPS Data Tools</strong><span>Unofficial toolkit for public BPS data · <a href="https://github.com/hengkykurniawan/bps_download#readme">Read the documentation</a></span></div></footer>
-
-  <script>
-    document.querySelectorAll('.copy').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const text = button.parentElement.querySelector('code').textContent;
-        try {
-          await navigator.clipboard.writeText(text);
-          button.textContent = 'Copied';
-          setTimeout(() => { button.textContent = 'Copy'; }, 1400);
-        } catch {
-          const range = document.createRange();
-          range.selectNodeContents(button.parentElement.querySelector('code'));
-          const selection = window.getSelection();
-          selection.removeAllRanges();
-          selection.addRange(range);
-          button.textContent = 'Selected';
-          setTimeout(() => { button.textContent = 'Copy'; }, 1400);
-        }
-      });
-    });
-  </script>
-</body>
-</html>
+buildNav();stateBar();checkConnection();show('subjects');refreshNewCount();setInterval(refreshNewCount,60000);
+</script></body></html>

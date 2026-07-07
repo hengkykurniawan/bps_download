@@ -39,7 +39,9 @@ BASE = "https://webapi.bps.go.id/v1/api"
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PAGES_ORIGIN = "https://hengkykurniawan.github.io"
 HOST, PORT = "127.0.0.1", 8765
+LOCAL_ORIGINS = {f"http://{HOST}:{PORT}", f"http://localhost:{PORT}"}
 
 SETTINGS = {"domain": "0000", "lang": "ind", "perpage": 100}
 JOBS = {}            # job_id -> dict(status,total,done,current,log,error,folder,kind)
@@ -715,10 +717,27 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        origin = self.headers.get("Origin")
+        if origin == PAGES_ORIGIN:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Vary", "Origin")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
+
+    def _origin_allowed(self):
+        origin = self.headers.get("Origin")
+        return not origin or origin == PAGES_ORIGIN or origin in LOCAL_ORIGINS
+
+    def do_OPTIONS(self):
+        """Allow the GitHub Pages UI to call this loopback-only service."""
+        if not self._origin_allowed():
+            return self._send(403, {"error": "origin not allowed"})
+        self._send(204, b"")
 
     def _q(self):
         return urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -730,9 +749,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
         q = self._q()
+        if not self._origin_allowed():
+            return self._send(403, {"error": "origin not allowed"})
         try:
             if path == "/":
-                return self._send(200, PAGE, "text/html; charset=utf-8")
+                page_path = os.path.join(SCRIPT_DIR, "docs", "index.html")
+                page = PAGE
+                if os.path.exists(page_path):
+                    with open(page_path, encoding="utf-8") as f:
+                        page = f.read()
+                return self._send(200, page, "text/html; charset=utf-8")
             if path == "/api/settings":
                 k = load_key()
                 return self._send(200, {**SETTINGS, "key_set": bool(k),
@@ -789,6 +815,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
+        if not self._origin_allowed():
+            return self._send(403, {"error": "origin not allowed"})
         try:
             b = self._body()
             if path == "/api/settings":

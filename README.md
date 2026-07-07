@@ -1,6 +1,6 @@
 # BPS Data Tools
 
-**Project page:** https://hengkykurniawan.github.io/bps_download/
+**Interactive app:** https://hengkykurniawan.github.io/bps_download/
 
 **Repository:** https://github.com/hengkykurniawan/bps_download
 
@@ -35,7 +35,11 @@ A local, browser-based UI that wraps everything below. Zero install.
 python bps_app.py
 ```
 
-A browser opens at **http://127.0.0.1:8765**. **Keep the terminal/window open while using the app** — it's a local server, so the page only works while it's running. Press `Ctrl+C` (or close the window) to stop.
+A browser opens at **http://127.0.0.1:8765**. You can use that local page or the
+**GitHub Pages app** linked above; both connect to the same private loopback
+service. Keep the terminal/window open while using either interface. Your API
+key remains in `.bps_key` and is never stored in GitHub Pages. Press `Ctrl+C`
+(or close the window) to stop.
 
 **Menus:**
 - **🔔 What's New** — a digest of recent + changed variables and publications across **all 37 subjects**, newest first. Click **Scan all subjects** once (a few minutes, runs in the background) and it tracks every subject — no need to open each one. Click an item to jump to its export (variables) or open the PDF (publications). The tab shows a **red count bubble** of NEW (changed-since-seen) items, refreshed on load, after each scan, and every minute.
