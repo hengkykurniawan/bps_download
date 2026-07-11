@@ -36,10 +36,22 @@ python bps_app.py
 ```
 
 A browser opens at **http://127.0.0.1:8765**. You can use that local page or the
-**GitHub Pages app** linked above; both connect to the same private loopback
-service. Keep the terminal/window open while using either interface. Your API
-key remains in `.bps_key` and is never stored in GitHub Pages. Press `Ctrl+C`
-(or close the window) to stop.
+**GitHub Pages app** linked above; both use the same private local service.
+Keep the terminal/window open while using either interface. Your API key remains
+in `.bps_key` and is never stored in GitHub Pages. Press `Ctrl+C` (or close the
+window) to stop.
+
+If the GitHub Pages app says it cannot connect and your browser does **not**
+show an "Allow local network access" prompt, open **http://127.0.0.1:8765/**
+directly instead. It is the same interactive app, served from your computer, and
+avoids that browser security block.
+
+For using the GitHub Pages entry point without auto-opening a second browser
+window, start only the local companion service:
+
+```
+python bps_app.py --no-browser
+```
 
 **Menus:**
 - **🔔 What's New** — a digest of recent + changed variables and publications across **all 37 subjects**, newest first. Click **Scan all subjects** once (a few minutes, runs in the background) and it tracks every subject — no need to open each one. Click an item to jump to its export (variables) or open the PDF (publications). The tab shows a **red count bubble** of NEW (changed-since-seen) items, refreshed on load, after each scan, and every minute.

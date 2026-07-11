@@ -1142,6 +1142,7 @@ def run_checks(subjects, force=False):
 def main():
     import sys
     argv = sys.argv[1:]
+    no_browser = "--no-browser" in argv
     if argv and argv[0] in ("--check", "--check-all"):
         force = "--force" in argv
         rest = [a for a in argv[1:] if a != "--force"]
@@ -1152,10 +1153,11 @@ def main():
     url = f"http://{HOST}:{PORT}/"
     print(f"BPS Data Downloader running at {url}")
     print("Press Ctrl+C to stop.   (headless update check: python bps_app.py --check 530 531)")
-    try:
-        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
-    except Exception:
-        pass
+    if not no_browser:
+        try:
+            threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+        except Exception:
+            pass
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

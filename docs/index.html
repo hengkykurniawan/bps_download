@@ -36,7 +36,8 @@ tr.clk:hover{background:#243044;cursor:pointer}
 a{color:var(--ac)}.hide{display:none}
 .connection{padding:10px 20px;background:#172033;border-bottom:1px solid var(--bd);font-size:12px;color:var(--mut)}
 .connection.ok{background:#073b32;color:#a7f3d0}.connection.err{background:#3b1720;color:#fecdd3}
-.connection code{color:#e2e8f0}.connection button{margin-left:10px}
+.connection code{color:#e2e8f0}.connection button,.connection a.btn{margin-left:10px}
+a.btn{display:inline-block;text-decoration:none;background:var(--ac);color:#04293b;border:none;padding:7px 12px;border-radius:8px;font-weight:700}
 @media(max-width:700px){header{position:static}nav{position:static;overflow-x:auto;flex-wrap:nowrap}.connection{padding:10px 14px}main{padding:14px}input[type=text]{min-width:180px}.scroll{max-height:68vh}th,td{padding:7px 6px}}
 .note{font-size:12px;color:var(--mut);margin-top:6px}
 </style></head><body>
@@ -61,6 +62,19 @@ const api=u=>API_BASE+u;
 const S={subject:null,subjectTitle:null,var:null,varTitle:null,subjects:[],vars:[],newCount:0};
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const LOCAL_APP='http://127.0.0.1:8765/';
+function localHelpHTML(e){
+ const msg=e&&e.message?`<div class="note">Browser message: ${esc(e.message)}</div>`:'';
+ return `<div class="card"><div class="h2">Local app connection needed</div>
+ <p class="muted">GitHub Pages is only the public front door. The real BPS app runs privately on your computer so your API key stays in <code>.bps_key</code>.</p>
+ <ol class="muted" style="margin-top:0">
+  <li>Open the downloaded repository folder.</li>
+  <li>Run <code>python bps_app.py</code> or double-click <code>Start BPS App.bat</code>.</li>
+  <li>If this GitHub Page still cannot connect, use the local app directly:</li>
+ </ol>
+ <a class="btn" href="${LOCAL_APP}">Open local BPS app</a>
+ <button class="gho" id="reconnect2">Retry GitHub Page connection</button>${msg}</div>`;
+}
 async function jget(u){const r=await fetch(api(u));if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
 async function jpost(u,b){const r=await fetch(api(u),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
 async function checkConnection(){
@@ -68,7 +82,7 @@ async function checkConnection(){
  const b=$('#connection');b.classList.remove('hide','ok','err');
  b.innerHTML='Connecting to the private local service at <code>127.0.0.1:8765</code>…';
  try{const s=await jget('/api/settings');b.classList.add('ok');b.innerHTML=`✓ Local service connected · API key ${s.key_set?'ready':'not set'} <button class="gho" id="reconnect">Reconnect</button>`;}
- catch(e){b.classList.add('err');b.innerHTML='Local service is offline. In the downloaded repository, run <code>python bps_app.py</code>, then allow local-network access if your browser asks. <button class="gho" id="reconnect">Retry</button>';}
+ catch(e){b.classList.add('err');b.innerHTML='This browser is blocking the GitHub Page from talking to the private local app. Run <code>python bps_app.py</code>, then either retry here or open the local app directly. <a class="btn" href="'+LOCAL_APP+'">Open local app</a> <button class="gho" id="reconnect">Retry</button>';}
  const rb=$('#reconnect');if(rb)rb.onclick=checkConnection;
 }
 const TABS=[['whatsnew','🔔 What\'s New'],['subjects','Subjects'],['vars','Variables'],['years','Years & Export'],['pubs','Publications'],['static','Static Tables'],['downloads','Downloads'],['settings','Settings']];
@@ -134,7 +148,8 @@ async function loadWhatsNew(){const el=$('#v-whatsnew');
 // ---- Subjects (search input rendered ONCE; only the list updates on keystroke)
 async function loadSubjects(){const el=$('#v-subjects');
  if(!S.subjects.length){el.innerHTML='<div class="card">Loading subjects…</div>';
-  try{S.subjects=await jget('/api/subjects');}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+' — check the Settings tab (API key).</div>';return;}}
+  try{S.subjects=await jget('/api/subjects');}
+  catch(e){el.innerHTML=IS_PAGES?localHelpHTML(e):'<div class="card">Error: '+esc(e.message)+' — check the Settings tab (API key).</div>';const r=$('#reconnect2');if(r)r.onclick=checkConnection;return;}}
  el.innerHTML=`<div class="card"><div class="row"><input type="text" id="sq" placeholder="Search subjects…"><span class="muted" id="scount"></span></div></div><div id="subjlist"></div>`;
  $('#sq').oninput=e=>renderSubjectRows(e.target.value);
  renderSubjectRows('');$('#sq').focus();}
