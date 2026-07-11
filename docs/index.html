@@ -63,6 +63,12 @@ const S={subject:null,subjectTitle:null,var:null,varTitle:null,subjects:[],vars:
 const $=s=>document.querySelector(s);
 const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const LOCAL_APP='http://127.0.0.1:8765/';
+async function fetchWithTimeout(url, options, timeoutMs){
+ if(!timeoutMs)return fetch(url,options);
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+ try{return await fetch(url,{...(options||{}),signal:ctrl.signal});}
+ finally{clearTimeout(timer);}
+}
 function localHelpHTML(e){
  const msg=e&&e.message?`<div class="note">Browser message: ${esc(e.message)}</div>`:'';
  return `<div class="card"><div class="h2">Local app connection needed</div>
@@ -75,13 +81,13 @@ function localHelpHTML(e){
  <a class="btn" href="${LOCAL_APP}">Open local BPS app</a>
  <button class="gho" id="reconnect2">Retry GitHub Page connection</button>${msg}</div>`;
 }
-async function jget(u){const r=await fetch(api(u));if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
-async function jpost(u,b){const r=await fetch(api(u),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
+async function jget(u,timeoutMs){const r=await fetchWithTimeout(api(u),{},timeoutMs);if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
+async function jpost(u,b,timeoutMs){const r=await fetchWithTimeout(api(u),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)},timeoutMs);if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json();}
 async function checkConnection(){
  if(!IS_PAGES)return;
  const b=$('#connection');b.classList.remove('hide','ok','err');
  b.innerHTML='Connecting to the private local service at <code>127.0.0.1:8765</code>…';
- try{const s=await jget('/api/settings');b.classList.add('ok');b.innerHTML=`✓ Local service connected · API key ${s.key_set?'ready':'not set'} <button class="gho" id="reconnect">Reconnect</button>`;}
+ try{const s=await jget('/api/settings',5000);b.classList.add('ok');b.innerHTML=`✓ Local service connected · API key ${s.key_set?'ready':'not set'} <button class="gho" id="reconnect">Reconnect</button>`;}
  catch(e){b.classList.add('err');b.innerHTML='This browser is blocking the GitHub Page from talking to the private local app. Run <code>python bps_app.py</code>, then either retry here or open the local app directly. <a class="btn" href="'+LOCAL_APP+'">Open local app</a> <button class="gho" id="reconnect">Retry</button>';}
  const rb=$('#reconnect');if(rb)rb.onclick=checkConnection;
 }
@@ -148,7 +154,7 @@ async function loadWhatsNew(){const el=$('#v-whatsnew');
 // ---- Subjects (search input rendered ONCE; only the list updates on keystroke)
 async function loadSubjects(){const el=$('#v-subjects');
  if(!S.subjects.length){el.innerHTML='<div class="card">Loading subjects…</div>';
-  try{S.subjects=await jget('/api/subjects');}
+  try{S.subjects=await jget('/api/subjects',IS_PAGES?10000:0);}
   catch(e){el.innerHTML=IS_PAGES?localHelpHTML(e):'<div class="card">Error: '+esc(e.message)+' — check the Settings tab (API key).</div>';const r=$('#reconnect2');if(r)r.onclick=checkConnection;return;}}
  el.innerHTML=`<div class="card"><div class="row"><input type="text" id="sq" placeholder="Search subjects…"><span class="muted" id="scount"></span></div></div><div id="subjlist"></div>`;
  $('#sq').oninput=e=>renderSubjectRows(e.target.value);
