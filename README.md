@@ -100,7 +100,7 @@ Schedule it on Windows (e.g. daily at 6am) with Task Scheduler so you get a fres
 
 ```
 schtasks /create /tn "BPS update scan" /sc DAILY /st 06:00 ^
-  /tr "python \"C:\Users\hengk\BPS\downloads\bps_app.py\" --check-all"
+  /tr "python \"C:\Users\hengk\BPS\BPS_download\bps_app.py\" --check-all"
 ```
 
 (If the task can't find `python`, use its full path, e.g.
