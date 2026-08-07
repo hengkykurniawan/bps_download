@@ -27,6 +27,8 @@ tr.clk:hover{background:#243044;cursor:pointer}
 .scroll{max-height:62vh;overflow:auto;border:1px solid var(--bd);border-radius:10px}
 a{color:var(--ac)}.hide{display:none}.note{font-size:12px;color:var(--mut);margin-top:6px}
 .banner{background:#3b2a12;border:1px solid #92610e;color:#fde68a;padding:12px 16px;border-radius:10px;margin-bottom:16px}
+.upd{display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;margin-left:7px;font-weight:700;white-space:nowrap}
+.upd.fresh{background:#22c55e;color:#04210f}
 @media(max-width:700px){header{position:static}nav{position:static;overflow-x:auto;flex-wrap:nowrap}main{padding:14px}input[type=text],input[type=password]{min-width:180px}.scroll{max-height:68vh}th,td{padding:7px 6px}}
 </style></head><body>
 <header><h1>📊 BPS Data Downloader <span class="sub">webapi.bps.go.id · runs entirely in your browser</span></h1>
@@ -52,6 +54,30 @@ const DOMAIN=()=>localStorage.getItem('bps_domain')||'0000';
 const LANG=()=>localStorage.getItem('bps_lang')||'ind';
 function clean(s){if(s==null)return s;s=String(s).replace(/<[^>]+>/g,'');const t=document.createElement('textarea');t.innerHTML=s;return t.value.replace(/\s+/g,' ').trim();}
 
+// ---- freshness helpers: badge when BPS updated something within the last 30 days
+const FRESH_DAYS=30;
+const daysAgo=ts=>{const d=String(ts||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return null;
+ const t=new Date(d+'T00:00:00');if(isNaN(t))return null;return Math.floor((Date.now()-t.getTime())/86400000);};
+const isFresh=ts=>{const n=daysAgo(ts);return n!=null&&n>=0&&n<=FRESH_DAYS;};
+const freshBadge=ts=>{const n=daysAgo(ts);return isFresh(ts)?`<span class="upd fresh" title="BPS updated this ${n} day(s) ago (${esc(String(ts))})">↻ ${n}d</span>`:'';};
+const LEGEND=`<span class="upd fresh" style="margin-left:0">↻ Nd</span> = updated by BPS within the last ${FRESH_DAYS} days (N days ago)`;
+// cached last_update per variable (per region), so re-visits are instant; refreshed after 6h
+const LU_TTL=6*3600*1000;
+const luCache=()=>{try{return JSON.parse(localStorage.getItem('bps_lu')||'{}');}catch(e){return{};}};
+const luSave=c=>{try{localStorage.setItem('bps_lu',JSON.stringify(c));}catch(e){}};
+// read only the first chunks of the data response to grab last_update (it sits
+// near the top of the JSON), then abort — avoids downloading whole data cubes
+async function fetchLastUpdate(v,th){const k=getKey();const ctl=new AbortController();
+ try{const r=await fetch(`${BASE}/list/model/data/lang/${LANG()}/domain/${DOMAIN()}/var/${v}/th/${th}/key/${k}/`,{signal:ctl.signal});
+  if(!r.ok||!r.body)return null;
+  const reader=r.body.getReader();const dec=new TextDecoder();let buf='';
+  for(let i=0;i<12;i++){const c=await reader.read();if(c.done)break;
+   buf+=dec.decode(c.value,{stream:true});
+   const m=buf.match(/"last_update"\s*:\s*"([^"]*)"/);
+   if(m){ctl.abort();return m[1];}}
+  const m=buf.match(/"last_update"\s*:\s*"([^"]*)"/);return m?m[1]:null;
+ }catch(e){return null;}}
+
 async function apiList(model,filt){const k=getKey();if(!k)throw new Error('No API key set — open the Settings tab and paste your free BPS key.');
  const seg=filt?filt+'/':'';let out=[],page=1;
  while(true){const url=`${BASE}/list/model/${model}/lang/${LANG()}/domain/${DOMAIN()}/${seg}perpage/100/page/${page}/key/${k}/`;
@@ -62,6 +88,23 @@ async function apiList(model,filt){const k=getKey();if(!k)throw new Error('No AP
  return out;}
 async function apiData(v,th){const k=getKey();const url=`${BASE}/list/model/data/lang/${LANG()}/domain/${DOMAIN()}/var/${v}/th/${th}/key/${k}/`;
  const r=await fetch(url);if(!r.ok)throw new Error('BPS API HTTP '+r.status);return r.json();}
+// Some models (statictable) ignore perpage and return 10/page -> dozens of pages.
+// Fetch page 1 to learn the count, then pull the rest in parallel.
+async function apiListParallel(model,onProgress){const k=getKey();
+ if(!k)throw new Error('No API key set — open the Settings tab and paste your free BPS key.');
+ const url=p=>`${BASE}/list/model/${model}/lang/${LANG()}/domain/${DOMAIN()}/perpage/100/page/${p}/key/${k}/`;
+ const first=await (await fetch(url(1))).json();
+ const meta=first.data&&first.data[0]?first.data[0]:{pages:1};
+ let out=(first.data&&first.data[1])?first.data[1].slice():[];
+ const pages=meta.pages||1;if(pages<2)return out;
+ const queue=[];for(let p=2;p<=pages;p++)queue.push(p);
+ const results={};let done=1;
+ const worker=async()=>{while(queue.length){const p=queue.shift();
+   try{const d=await (await fetch(url(p))).json();results[p]=(d.data&&d.data[1])?d.data[1]:[];}catch(e){results[p]=[];}
+   done++;if(onProgress)onProgress(done,pages);}};
+ await Promise.all(Array.from({length:8},worker));
+ for(let p=2;p<=pages;p++)out=out.concat(results[p]||[]);
+ return out;}
 
 function decodeRows(d){if(d['data-availability']!=='available')return [];
  const V=d.var[0],vid=String(V.val),unit=clean(V.unit||''),vlab=clean(V.label||'');
@@ -105,22 +148,50 @@ function subjRows(f){const q=(f||'').toLowerCase();
  $('#subjlist').querySelectorAll('tr.clk').forEach(r=>r.onclick=()=>{S.subject=r.dataset.id;S.subjectTitle=r.dataset.t;S.var=null;S.vars=[];stateBar();show('vars');});}
 
 // ---- Variables
+function applyLu(){const c=luCache();S.vars.forEach(v=>{const e=c[DOMAIN()+':'+v.var_id];v.ts=e?e.ts:(v.ts||'');});
+ S.vars.sort((a,b)=>{const ta=a.ts||'',tb=b.ts||'';if(ta&&tb)return tb.localeCompare(ta);if(ta)return -1;if(tb)return 1;return a.var_id-b.var_id;});}
+function freshCount(){return S.vars.filter(v=>isFresh(v.ts)).length;}
 async function loadVars(){const el=$('#v-vars');if(!S.subject){el.innerHTML='<div class="card">Pick a subject first (Subjects tab).</div>';return;}
  el.innerHTML='<div class="card">Loading variables…</div>';
  try{S.vars=(await apiList('var','subjectcsa/'+S.subject)).map(r=>({var_id:r.var_id,title:clean(r.title),unit:clean(r.unit||'')}));}
  catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ applyLu();
  el.innerHTML=`<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start">
     <div class="h2" style="margin:0">Variables · subject ${S.subject} — ${esc(S.subjectTitle)}</div>
     <button class="act" id="bdall">⬇ Download all ${S.vars.length} variables (CSV)</button></div>
   <div class="row" style="margin-top:8px"><input type="text" id="vq" placeholder="Search variables…"><span class="muted" id="vcount"></span></div>
+  <div class="note" id="freshnote">${LEGEND}</div>
+  <div id="updprog" class="note"></div>
   <div id="bulkprog" class="note"></div></div>
-  <div class="scroll"><table><thead><tr><th style="width:80px">var</th><th>Title</th><th style="width:130px">Unit</th></tr></thead><tbody id="vtb"></tbody></table></div>`;
- $('#vq').oninput=e=>varRows(e.target.value);$('#bdall').onclick=bulkDownloadVars;varRows('');}
+  <div class="scroll"><table><thead><tr><th style="width:70px">var</th><th>Title</th><th style="width:150px">Last update (BPS)</th><th style="width:115px">Unit</th></tr></thead><tbody id="vtb"></tbody></table></div>`;
+ $('#vq').oninput=e=>varRows(e.target.value);$('#bdall').onclick=bulkDownloadVars;varRows('');
+ checkUpdates();}
 function varRows(f){const q=(f||'').toLowerCase();
  const items=S.vars.filter(v=>!q||(v.title||'').toLowerCase().includes(q)||String(v.var_id).includes(q));
  $('#vcount').textContent=items.length+' of '+S.vars.length;
- $('#vtb').innerHTML=items.map(v=>`<tr class="clk" data-id="${v.var_id}" data-t="${esc(v.title)}"><td><span class="pill">${v.var_id}</span></td><td>${esc(v.title)}</td><td class="muted">${esc(v.unit)}</td></tr>`).join('');
+ const fn=$('#freshnote');if(fn)fn.innerHTML=LEGEND+` — <b>${freshCount()}</b> of ${S.vars.length} variables are fresh. Sorted by most-recent BPS update.`;
+ $('#vtb').innerHTML=items.map(v=>`<tr class="clk" data-id="${v.var_id}" data-t="${esc(v.title)}"><td><span class="pill">${v.var_id}</span></td><td>${esc(v.title)}${freshBadge(v.ts)}</td><td class="muted">${esc(String(v.ts||'—').slice(0,16))}</td><td class="muted">${esc(v.unit)}</td></tr>`).join('');
  $('#vtb').querySelectorAll('tr.clk').forEach(r=>r.onclick=()=>{S.var=r.dataset.id;S.varTitle=r.dataset.t;stateBar();show('years');});}
+let checking=false;
+async function checkUpdates(){if(checking||!S.vars.length)return;
+ const cache=luCache(),now=Date.now();
+ const todo=S.vars.filter(v=>{const e=cache[DOMAIN()+':'+v.var_id];return !(e&&e.at&&now-e.at<LU_TTL);}).slice();
+ if(!todo.length)return;
+ checking=true;const total=todo.length;let done=0;const mySubject=S.subject;
+ const prog=()=>{const el=$('#updprog');if(el&&S.subject===mySubject)el.textContent=`Checking BPS update dates… ${done}/${total} (lightweight requests; badges appear as they arrive)`;};
+ prog();
+ const worker=async()=>{while(todo.length){const v=todo.shift();
+   try{const ys=await apiList('th','var/'+v.var_id);
+     if(ys.length){const th=Math.max(...ys.map(y=>+y.th_id));
+       const ts=await fetchLastUpdate(v.var_id,th);
+       if(ts)cache[DOMAIN()+':'+v.var_id]={ts:ts,at:Date.now()};}}
+   catch(e){}
+   done++;if(done%5===0||!todo.length){luSave(cache);if(S.subject===mySubject){applyLu();varRows($('#vq')?$('#vq').value:'');}}
+   prog();}};
+ await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);
+ luSave(cache);checking=false;
+ if(S.subject===mySubject){applyLu();varRows($('#vq')?$('#vq').value:'');
+  const el=$('#updprog');if(el)el.textContent=`Update check done — ${freshCount()} variable(s) updated by BPS in the last ${FRESH_DAYS} days.`;}}
 async function bulkDownloadVars(){if(!S.vars.length)return;
  if(!confirm('Export all '+S.vars.length+' variables (all available years) for subject '+S.subject+' into one CSV?\n\nThis runs in your browser, one request per variable/year — it can take a while for big subjects. Keep this tab open.'))return;
  const prog=$('#bulkprog');let all=[],done=0,fail=0;
@@ -149,29 +220,32 @@ async function loadYears(){const el=$('#v-years');if(!S.var){el.innerHTML='<div 
    <label class="muted"><input type="checkbox" id="ball"> all years</label></div></div>
   <div id="prev"></div>`;
  const sel=()=>Array.from($('#ysel').selectedOptions).map(o=>o.value);
+ const luLine=lu=>lu?`<div class="note">📅 BPS last updated this data: <b>${esc(lu)}</b>${freshBadge(lu)}${isFresh(lu)?'':' <span class="muted">(older than '+FRESH_DAYS+' days)</span>'}</div>`:'';
  $('#bprev').onclick=async()=>{const th=$('#ball').checked?ys.map(y=>y.th_id):sel();if(!th.length){alert('Select a period or tick all years.');return;}
   $('#prev').innerHTML='<div class="card">Loading preview…</div>';
-  try{const rows=decodeRows(await apiData(S.var,th[0]));
-   let t=`<div class="card"><div class="h2">Preview — ${rows.length.toLocaleString()} rows (first period, showing ${Math.min(rows.length,200)})</div><div class="scroll"><table><thead><tr>${CSV_COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  try{const d=await apiData(S.var,th[0]);const rows=decodeRows(d);
+   let t=`<div class="card"><div class="h2">Preview — ${rows.length.toLocaleString()} rows (first period, showing ${Math.min(rows.length,200)})</div>${luLine(d.last_update)}<div class="scroll"><table><thead><tr>${CSV_COLS.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
    rows.slice(0,200).forEach(r=>{t+='<tr>'+CSV_COLS.map(c=>`<td>${esc(r[c])}</td>`).join('')+'</tr>';});
    $('#prev').innerHTML=t+'</tbody></table></div></div>';}catch(e){$('#prev').innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';}};
  $('#bcsv').onclick=async()=>{const th=$('#ball').checked?ys.map(y=>y.th_id):sel();if(!th.length){alert('Select at least one period.');return;}
-  $('#prev').innerHTML='<div class="card">Building CSV…</div>';let all=[];
-  try{for(const t of th)all=all.concat(decodeRows(await apiData(S.var,t)));
-   download('data_var'+S.var+'.csv',toCSV(all));$('#prev').innerHTML=`<div class="card">Downloaded ${all.length.toLocaleString()} rows.</div>`;}
+  $('#prev').innerHTML='<div class="card">Building CSV…</div>';let all=[],lu='';
+  try{for(const t of th){const d=await apiData(S.var,t);all=all.concat(decodeRows(d));if(d.last_update&&d.last_update>lu)lu=d.last_update;}
+   download('data_var'+S.var+'.csv',toCSV(all));$('#prev').innerHTML=`<div class="card">Downloaded ${all.length.toLocaleString()} rows.${luLine(lu)}</div>`;}
   catch(e){$('#prev').innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';}};}
 
 // ---- Publications
 async function loadPubs(){const el=$('#v-pubs');if(!S.subject){el.innerHTML='<div class="card">Pick a subject first.</div>';return;}
  el.innerHTML='<div class="card">Loading publications…</div>';let pubs;
- try{pubs=(await apiList('publication','subjectcsa/'+S.subject)).map(r=>({title:clean(r.title),size:r.size||'',rl_date:r.rl_date||'',pdf:r.pdf||''}));}
+ try{pubs=(await apiList('publication','subjectcsa/'+S.subject)).map(r=>{const best=[r.rl_date||'',r.updt_date||''].sort().pop();
+   return {title:clean(r.title),size:r.size||'',rl_date:r.rl_date||'',best:best,pdf:r.pdf||''};});}
  catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ const nf=pubs.filter(p=>isFresh(p.best)).length;
  el.innerHTML=`<div class="card"><div class="h2">Publications (PDF) · subject ${S.subject} — ${esc(S.subjectTitle)}</div>
   <div class="row"><span class="pill">${pubs.length} PDFs</span><input type="text" id="pq" placeholder="Filter titles…"></div>
-  <div class="note">Click a PDF link to download (opens in a new tab).</div></div>
+  <div class="note">${LEGEND} — <b>${nf}</b> publication(s) released/updated by BPS in the last ${FRESH_DAYS} days. Click a PDF link to download (opens in a new tab).</div></div>
   <div class="scroll"><table><thead><tr><th>Title</th><th style="width:90px">Size</th><th style="width:100px">Date</th><th style="width:70px"></th></tr></thead><tbody id="ptb"></tbody></table></div>`;
  const draw=f=>{const q=(f||'').toLowerCase();$('#ptb').innerHTML=pubs.filter(p=>!q||p.title.toLowerCase().includes(q)).map(p=>
-   `<tr><td>${esc(p.title)}</td><td class="muted">${esc(p.size)}</td><td class="muted">${esc(p.rl_date)}</td><td>${p.pdf?`<a href="${esc(p.pdf)}" target="_blank" rel="noopener">PDF</a>`:'—'}</td></tr>`).join('');};
+   `<tr><td>${esc(p.title)}${freshBadge(p.best)}</td><td class="muted">${esc(p.size)}</td><td class="muted">${esc(p.rl_date)}</td><td>${p.pdf?`<a href="${esc(p.pdf)}" target="_blank" rel="noopener">PDF</a>`:'—'}</td></tr>`).join('');};
  draw('');$('#pq').oninput=e=>draw(e.target.value);}
 
 // ---- Static tables
@@ -179,10 +253,13 @@ async function loadStatic(){const el=$('#v-static');
  el.innerHTML=`<div class="card"><div class="h2">Static Tables (Excel)</div>
   <div class="row"><button class="gho" id="ballst">Load all static tables</button><input type="text" id="tq" placeholder="Filter titles…"></div>
   <div class="note">BPS's static-table subject filter is unreliable, so this lists all tables; use the filter box. Excel opens in a new tab.</div></div><div id="stb"></div>`;
- $('#ballst').onclick=async()=>{$('#stb').innerHTML='<div class="card">Loading… (fetches ~685 tables)</div>';
-  try{const rows=(await apiList('statictable')).map(r=>({title:clean(r.title),subj:r.subj||'',size:r.size||'',excel:r.excel||''}));
-   const draw=f=>{const q=(f||'').toLowerCase();$('#stb').innerHTML=`<div class="scroll"><table><thead><tr><th>Title</th><th style="width:160px">Subject</th><th style="width:80px">Size</th><th style="width:60px"></th></tr></thead><tbody>`+
-     rows.filter(t=>!q||t.title.toLowerCase().includes(q)).map(t=>`<tr><td>${esc(t.title)}</td><td class="muted">${esc(t.subj)}</td><td class="muted">${esc(t.size)}</td><td>${t.excel?`<a href="${esc(t.excel)}" target="_blank" rel="noopener">xlsx</a>`:'—'}</td></tr>`).join('')+'</tbody></table></div>';};
+ $('#ballst').onclick=async()=>{$('#stb').innerHTML='<div class="card" id="stload">Loading static tables… (BPS returns these 10 per page, so this takes a moment)</div>';
+  try{const raw=await apiListParallel('statictable',(d,t)=>{const el=$('#stload');if(el)el.textContent=`Loading static tables… page ${d}/${t}`;});
+   const rows=raw.map(r=>({title:clean(r.title),subj:r.subj||'',size:r.size||'',updt:String(r.updt_date||'').slice(0,10),excel:r.excel||''}));
+   rows.sort((a,b)=>(b.updt||'').localeCompare(a.updt||''));
+   const nf=rows.filter(t=>isFresh(t.updt)).length;
+   const draw=f=>{const q=(f||'').toLowerCase();$('#stb').innerHTML=`<div class="card" style="padding:8px 12px"><div class="note" style="margin:0">${LEGEND} — <b>${nf}</b> table(s) updated by BPS in the last ${FRESH_DAYS} days. Sorted newest first.</div></div><div class="scroll"><table><thead><tr><th>Title</th><th style="width:150px">Subject</th><th style="width:100px">Updated</th><th style="width:70px">Size</th><th style="width:55px"></th></tr></thead><tbody>`+
+     rows.filter(t=>!q||t.title.toLowerCase().includes(q)).map(t=>`<tr><td>${esc(t.title)}${freshBadge(t.updt)}</td><td class="muted">${esc(t.subj)}</td><td class="muted">${esc(t.updt||'—')}</td><td class="muted">${esc(t.size)}</td><td>${t.excel?`<a href="${esc(t.excel)}" target="_blank" rel="noopener">xlsx</a>`:'—'}</td></tr>`).join('')+'</tbody></table></div>';};
    draw('');$('#tq').oninput=e=>draw(e.target.value);}catch(e){$('#stb').innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';}};}
 
 // ---- Settings
