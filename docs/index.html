@@ -90,6 +90,14 @@ const LEGEND=`<span class="upd fresh" style="margin-left:0">↻ Nd</span> = upda
 const LU_TTL=6*3600*1000;
 const luCache=()=>{try{return JSON.parse(localStorage.getItem('bps_lu')||'{}');}catch(e){return{};}};
 const luSave=c=>{try{localStorage.setItem('bps_lu',JSON.stringify(c));}catch(e){}};
+// The `th` (year) model ignores perpage and returns 10/page, but is sorted
+// NEWEST-FIRST — so page 1's first entry is the latest year. One request, not N.
+async function latestYear(v){const k=getKey();
+ const r=await fetch(`${BASE}/list/model/th/lang/${LANG()}/domain/${DOMAIN()}/var/${v}/key/${k}/`);
+ if(!r.ok)return null;const d=await r.json();
+ const rows=(d.data&&d.data[1])?d.data[1]:[];
+ if(!rows.length)return null;
+ return rows.reduce((m,x)=>Math.max(m,+x.th_id),0)||null;}
 // read only the first chunks of the data response to grab last_update (it sits
 // near the top of the JSON), then abort — avoids downloading whole data cubes
 async function fetchLastUpdate(v,th){const k=getKey();const ctl=new AbortController();
@@ -115,9 +123,10 @@ async function apiData(v,th){const k=getKey();const url=`${BASE}/list/model/data
  const r=await fetch(url);if(!r.ok)throw new Error('BPS API HTTP '+r.status);return r.json();}
 // Some models (statictable) ignore perpage and return 10/page -> dozens of pages.
 // Fetch page 1 to learn the count, then pull the rest in parallel.
-async function apiListParallel(model,onProgress){const k=getKey();
+async function apiListParallel(model,onProgress,filt){const k=getKey();
  if(!k)throw new Error('No API key set — open the Settings tab and paste your free BPS key.');
- const url=p=>`${BASE}/list/model/${model}/lang/${LANG()}/domain/${DOMAIN()}/perpage/100/page/${p}/key/${k}/`;
+ const seg=filt?filt+'/':'';
+ const url=p=>`${BASE}/list/model/${model}/lang/${LANG()}/domain/${DOMAIN()}/${seg}perpage/100/page/${p}/key/${k}/`;
  const first=await (await fetch(url(1))).json();
  const meta=first.data&&first.data[0]?first.data[0]:{pages:1};
  let out=(first.data&&first.data[1])?first.data[1].slice():[];
@@ -206,14 +215,15 @@ async function checkUpdates(){if(checking||!S.vars.length)return;
  const prog=()=>{const el=$('#updprog');if(el&&S.subject===mySubject)el.textContent=`Checking BPS update dates… ${done}/${total} (lightweight requests; badges appear as they arrive)`;};
  prog();
  const worker=async()=>{while(todo.length){const v=todo.shift();
-   try{const ys=await apiList('th','var/'+v.var_id);
-     if(ys.length){const th=Math.max(...ys.map(y=>+y.th_id));
-       const ts=await fetchLastUpdate(v.var_id,th);
-       if(ts)cache[DOMAIN()+':'+v.var_id]={ts:ts,at:Date.now()};}}
+   try{const th=await latestYear(v.var_id);
+     if(th){const ts=await fetchLastUpdate(v.var_id,th);
+       // remember even a null result so we don't re-query it every visit
+       cache[DOMAIN()+':'+v.var_id]={ts:ts||'',at:Date.now()};}
+     else cache[DOMAIN()+':'+v.var_id]={ts:'',at:Date.now()};}
    catch(e){}
    done++;if(done%5===0||!todo.length){luSave(cache);if(S.subject===mySubject){applyLu();varRows($('#vq')?$('#vq').value:'');}}
    prog();}};
- await Promise.all([worker(),worker(),worker(),worker(),worker(),worker()]);
+ await Promise.all(Array.from({length:8},worker));
  luSave(cache);checking=false;
  if(S.subject===mySubject){applyLu();varRows($('#vq')?$('#vq').value:'');
   const el=$('#updprog');if(el)el.textContent=`Update check done — ${freshCount()} variable(s) updated by BPS in the last ${FRESH_DAYS} days.`;}}
@@ -221,7 +231,7 @@ async function bulkDownloadVars(){if(!S.vars.length)return;
  if(!confirm('Export all '+S.vars.length+' variables (all available years) for subject '+S.subject+' into one CSV?\n\nThis runs in your browser, one request per variable/year — it can take a while for big subjects. Keep this tab open.'))return;
  const prog=$('#bulkprog');let all=[],done=0,fail=0;
  for(const v of S.vars){
-   try{const ys=(await apiList('th','var/'+v.var_id)).map(y=>y.th_id);
+   try{const ys=(await apiListParallel('th',null,'var/'+v.var_id)).map(y=>y.th_id);
      for(const th of ys){try{all=all.concat(decodeRows(await apiData(v.var_id,th)));}catch(e){fail++;}}}
    catch(e){fail++;}
    done++;prog.innerHTML=`Building CSV… ${done}/${S.vars.length} variables, ${all.length.toLocaleString()} rows so far${fail?', '+fail+' failed':''}`;
@@ -233,7 +243,10 @@ async function bulkDownloadVars(){if(!S.vars.length)return;
 // ---- Years & Export
 async function loadYears(){const el=$('#v-years');if(!S.var){el.innerHTML='<div class="card">Pick a variable first (Variables tab).</div>';return;}
  el.innerHTML='<div class="card">Loading periods…</div>';let ys;
- try{ys=await apiList('th','var/'+S.var);}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ // `th` ignores perpage (10/page) — fetch its pages in parallel so long series
+ // (some variables have 48 years) don't take forever or get truncated.
+ try{ys=await apiListParallel('th',null,'var/'+S.var);}catch(e){el.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>';return;}
+ ys.sort((a,b)=>(+b.th_id)-(+a.th_id));
  el.innerHTML=`<div class="card"><div class="h2">Years & Export · var ${S.var} — ${esc(S.varTitle)}</div>
   <div class="row" style="margin-bottom:8px"><label class="muted">Periods:</label>
    <select id="ysel" multiple size="${Math.min(8,Math.max(3,ys.length))}" style="min-width:240px">
